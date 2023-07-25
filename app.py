@@ -69,7 +69,7 @@ def _portforward_with_retry(k8s_file, namespace, svc, port):
             break
         k8s_file_path = os.path.join(config.k8s_config_path, k8s_file)
         kubectl_path = config.kubectl_path
-        script_path = os.path.join(base_dir, "script/pod.sh")
+        script_path = os.path.join(base_dir, "scripts/pod.sh")
         pods = os.popen(
             f"sh {script_path} {kubectl_path} {k8s_file_path} {namespace} {svc} {port}"
         ).read()
@@ -210,7 +210,7 @@ def api():
         namespace = data["namespace"]
         k8s_file_path = os.path.join(config.k8s_config_path, k8sconfigname)
         # 获取集群相应命名空间的服务名和集群IP
-        host_script_path = os.path.join(base_dir, "script/host.sh")
+        host_script_path = os.path.join(base_dir, "scripts/host.sh")
         kubectl_path = config.kubectl_path
         hosts = os.popen(
             f"sh {host_script_path} {kubectl_path} {k8s_file_path} {namespace}"
@@ -270,7 +270,7 @@ def api():
         # Pod检测
         k8s_file_path = os.path.join(config.k8s_config_path, k8sconfigname)
         kubectl_path = config.kubectl_path
-        script_path = os.path.join(base_dir, "script/pod.sh")
+        script_path = os.path.join(base_dir, "scripts/pod.sh")
         pods = os.popen(
             f"sh {script_path} {kubectl_path} {k8s_file_path} {namespace} {svc} {port}"
         ).read()

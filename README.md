@@ -2,6 +2,7 @@
 1. 一键添加hosts
 2. kubectl port-forward保活重连
 3. telepresence保活重连
+## ![示例](./images/example.png)
 
 # 安装依赖
 ```sh

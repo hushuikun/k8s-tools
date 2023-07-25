@@ -1,3 +1,8 @@
+# 功能
+1. 一键添加hosts
+2. kubectl port-forward保活重连
+3. telepresence保活重连
+
 # 安装依赖
 ```sh
 pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple

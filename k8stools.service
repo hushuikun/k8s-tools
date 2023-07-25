@@ -1,0 +1,12 @@
+
+[Unit]
+Description=K8S Tools
+
+[Service]
+Type=simple
+WorkingDirectory=/home/hushuikun/k8s-tools
+ExecStart=/home/hushuikun/anaconda3/envs/k8s-tools/bin/python /home/hushuikun/anaconda3/envs/k8s-tools/bin/flask run --port=12345
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

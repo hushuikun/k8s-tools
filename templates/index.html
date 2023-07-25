@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Dev Tools</title>
+    <style>
+        body {
+            color: #515a6e;
+        }
+
+        button {
+            color: #fff;
+            background-color: #2d8cf0;
+            border-color: #2d8cf0;
+            line-height: 1.5;
+            display: inline-block;
+            margin-bottom: 0;
+            font-weight: 400;
+            text-align: center;
+            vertical-align: middle;
+            -ms-touch-action: manipulation;
+            touch-action: manipulation;
+            cursor: pointer;
+            background-image: none;
+            border: 1px solid transparent;
+            white-space: nowrap;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            height: 32px;
+            padding: 0 15px;
+            font-size: 14px;
+            border-radius: 4px;
+        }
+
+        button,
+        button:focus,
+        button:active {
+            outline: 0;
+        }
+
+        button:hover {
+            background-color: #57a3f3;
+            border-color: #57a3f3;
+        }
+
+        input {
+            margin-right: 10px;
+            display: inline-block;
+            height: 32px;
+            line-height: 1.5;
+            padding: 4px 7px;
+            font-size: 14px;
+            border: 1px solid #dcdee2;
+            border-radius: 4px;
+            color: #515a6e;
+            background-color: #fff;
+            background-image: none;
+            position: relative;
+            cursor: text;
+        }
+
+        input:focus {
+            outline: 0;
+            -webkit-box-shadow: 0 0 0 2px rgba(45, 140, 240, .2);
+            box-shadow: 0 0 0 2px rgba(45, 140, 240, .2);
+        }
+
+        input:focus,
+        input:hover {
+            border-color: #57a3f3;
+        }
+
+        li {
+            margin: 8px;
+        }
+    </style>
+</head>
+
+<body>
+    {% if config and config.kubectl_path and config.telepresence_path %}
+    <h2>当前.kube路径: {{ config.k8s_config_path }}</h2>
+    <h2>该目录下有以下配置文件:</h2>
+    <ul>
+        {% for i in k8s_config_files %}
+        <li>
+            <h3>{{ i }}</h3>
+            <button type="button" onclick="telepresence('{{ i }}')">telepresence</button>
+            <h4>
+                {% if telepresence and telepresence.k8s_file == i %}
+                <ul>
+                    <li id="telepresence-sate">state: {{ telepresence.state }}</li>
+                </ul>
+                {% endif %}
+            </h4>
+            <button type="button" onclick="host('{{ i }}')">hosts</button>
+            <input type="text" id="host-namespace:{{ i }}" placeholder="命名空间">
+            <h4>
+                {% if hosts and hosts.config.k8s_file == i %}
+                <ul>
+                    {% for ns, hs in hosts.hosts_dict.items() %}
+                    <li>
+                        <a id="ns" onclick="showHide('hs:{{ ns }}')">{{ ns }}(点击展开)</a>
+                        <ul id="hs:{{ ns }}" style="display: none;">
+                            {% for h in hs %}
+                            <li>{{ h.name }}: <br><input id="{{ ns }}:{{ h.name }}" type="text" value="{{h.ip}}"><button type="button"
+                                    onclick="hostUpdate('{{ ns }}', '{{ h.name }}')">修改</button></li>
+                            {% endfor %}
+                        </ul>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            </h4>
+            <button type="button" onclick="portforwad('{{ i }}')">port-forward</button>
+            <input type="text" id="portforwad-namespace:{{ i }}" placeholder="命名空间">
+            <input type="text" id="portforwad-svc:{{ i }}" placeholder="服务名">
+            <input type="text" id="portforwad-port:{{ i }}" placeholder="端口映射, 例:5000:5000">
+            <h4>
+                <ul>
+                    {% for portforward in portforwards %}
+                        {% if portforward[0] == i %}
+                        <li>{{ portforward[1] }}###{{ portforward[2] }}###{{ portforward[3] }}###子进程ID:{{ portforward[4] }}  
+                            <button type="button"onclick="portforwadDelete('{{portforward[0]}}###{{portforward[1]}}###{{portforward[2]}}###{{portforward[3]}}')">删除</button>
+                            <button type="button"onclick="portforwadReconnect('{{portforward[0]}}###{{portforward[1]}}###{{portforward[2]}}###{{portforward[3]}}')">重连</button></li>
+                        {% endif %}
+                    {% endfor %}
+                </ul>
+            </h4>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <h2>初始化</h2>
+    <form id="myForm">
+        <input type="text" id="k8sConfigPath" placeholder="k8s配置文件路径"><br>
+        <input type="text" id="kubectlPath" placeholder="kubectl路径"><br>
+        <input type="text" id="telepresencePath" placeholder="telepresence路径"><br>
+        <input type="text" id="sudoPassword" placeholder="sudo密码"><br>
+        <button type="button" onclick="init()">Submit</button>
+    </form>
+    {% endif %}
+
+</body>
+<script>
+    {% if telepresence and telepresence.state == "connecting" %}
+    var intervalId = setInterval(function () {
+        getTelepresenceState(); // 刷新页面
+    }, 3000); // 设置刷新间隔为 1000 毫秒，即每秒刷新一次
+    {% endif %}
+    function showHide(element) {
+        var list = document.getElementById(element)
+        if (list.style.display === "block") {
+            list.style.display = "none";
+        } else {
+            list.style.display = "block";
+        }
+    }
+    function sendJson(data) {
+        var jsonDataString = JSON.stringify(data);
+        return fetch('/api', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: jsonDataString
+        })
+    }
+    function init() {
+        // 构建 JSON 对象
+        var data = {
+            "operation": "init",
+            "data": {
+                k8sConfigPath: document.getElementById("k8sConfigPath").value,
+                kubectlPath: document.getElementById("kubectlPath").value,
+                telepresencePath: document.getElementById("telepresencePath").value,
+                sudoPassword: document.getElementById("sudoPassword").value,
+            }
+        };
+
+        // 发送 POST 请求
+        sendJson(data)
+            .then(response => response.text())
+                .then(res => {
+                    if (res === "ok") {
+                        location.reload()
+                    } else {
+                        alert(res)
+                    }
+                })
+    }
+
+    function telepresence(k8s_config_name) {
+        // 构建 JSON 对象
+        var data = {
+            "operation": "telepresence",
+            "data": k8s_config_name
+        };
+
+        // 发送 POST 请求
+        sendJson(data)
+            .then(function (response) {
+                // 处理响应
+                location.reload()
+            })
+    }
+
+    function getTelepresenceState() {
+        // 构建 JSON 对象
+        var data = {
+            "operation": "telepresenceState"
+        };
+
+        // 发送 POST 请求
+        sendJson(data)
+            .then(response => response.text())
+                .then(res => {
+                    var e = document.getElementById("telepresence-sate")
+                    e.textContent = "state: " + res
+                    if (res === "connected") {
+                        clearInterval(intervalId)
+                    }
+                })
+    }
+ 
+    function host(k8s_config_name) {
+        // 构建 JSON 对象
+        var namespace = document.getElementById("host-namespace:" + k8s_config_name).value
+        var data = {
+            "operation": "host",
+            "data": {
+                k8sConfigName: k8s_config_name,
+                namespace: namespace
+            }
+        };
+
+        // 发送 POST 请求
+        sendJson(data)
+            .then(function (response) {
+                // 处理响应
+                location.reload()
+            })
+    }
+
+    function hostUpdate(namespace, host) {
+        var ip = document.getElementById(namespace + ":" + host).value
+        var data = {
+            "operation": "hostUpdate",
+            "data": {
+                namespace: namespace,
+                host: host,
+                ip: ip
+            }
+        };
+
+        // 发送 POST 请求
+        sendJson(data)
+            .then(function (response) {
+                // 处理响应
+                location.reload()
+            })
+    }
+
+    function portforwad(k8s_config_name) {
+        // 构建 JSON 对象
+        var namespace = document.getElementById("portforwad-namespace:" + k8s_config_name).value
+        var svc = document.getElementById("portforwad-svc:" + k8s_config_name).value
+        var port = document.getElementById("portforwad-port:" + k8s_config_name).value
+        var data = {
+            "operation": "portforwad",
+            "data": {
+                k8sConfigName: k8s_config_name,
+                namespace: namespace,
+                svc: svc,
+                port: port
+            }
+        };
+
+        // 发送 POST 请求
+        sendJson(data)
+            .then(response => response.text())
+                .then(res => {
+                    if (res === "ok") {
+                        location.reload()
+                    } else {
+                        alert(res)
+                    }
+                })
+    }
+
+    function portforwadDelete(key) {
+        var data = {
+            "operation": "portforwadDelete",
+            "data": key
+        };
+
+        // 发送 POST 请求
+        sendJson(data)
+            .then(function (response) {
+                // 处理响应
+                location.reload()
+            })
+    }
+
+    function portforwadReconnect(key) {
+        var data = {
+            "operation": "portforwadReconnect",
+            "data": key
+        };
+
+        // 发送 POST 请求
+        sendJson(data)
+            .then(function (response) {
+                // 处理响应
+                location.reload()
+            })
+    }
+
+
+</script>
+
+</html>

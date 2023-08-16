@@ -170,6 +170,7 @@ def index():
         hosts_dict = {}
     portforwards =  [p.key.split("###") + [p.subprocess_id]
                      for p in Portforward.select()]
+    k8s_config_files.sort()
     context = {
         "config": config,
         "k8s_config_files": k8s_config_files,
